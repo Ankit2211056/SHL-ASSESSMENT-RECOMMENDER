@@ -1,0 +1,14 @@
+{
+  "name": "shl-assessment-consultant",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "python3 main.py",
+    "build": "echo 'No Node build required for Python FastAPI app'",
+    "start": "python3 main.py",
+    "preview": "python3 main.py",
+    "clean": "echo 'Clean complete'",
+    "lint": "echo 'No lint required for Node.js in Python-only project'"
+  }
+}

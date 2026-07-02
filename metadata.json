@@ -1,0 +1,6 @@
+{
+  "name": "SHL Assessment Recommender",
+  "description": "A conversational AI recommender to help hiring managers find the perfect SHL talent assessment tests based on roles, skills, and seniority.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

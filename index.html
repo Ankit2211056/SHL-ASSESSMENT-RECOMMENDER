@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SHL Conversational Assessment Recommender</title>
+    <!-- Tailwind CSS v4 CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+      
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      /* Staggered entrance animations */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      /* Custom scrollbars */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-100 min-h-screen flex items-center justify-center p-0 md:p-4">
+    
+    <!-- Main Application Container -->
+    <div id="app-root" class="w-full max-w-6xl h-screen md:h-[800px] bg-slate-50 flex flex-col overflow-hidden md:rounded-xl md:shadow-2xl border border-slate-300">
+      
+      <!-- Top Navigation Header -->
+      <header class="h-16 bg-[#002B49] text-white flex items-center justify-between px-6 shrink-0 shadow-md">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-blue-500 rounded-lg flex items-center justify-center font-extrabold tracking-wider italic text-sm text-white shadow-inner">
+            SHL
+          </div>
+          <div>
+            <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+              Conversational Assessment Recommender
+              <span class="hidden sm:inline-block px-2 py-0.5 bg-blue-900/50 text-blue-200 text-[10px] uppercase font-semibold rounded border border-blue-700">
+                Expert System
+              </span>
+            </h1>
+            <p class="text-[11px] text-slate-300 hidden sm:block">Conversational Ground Truth Advisor</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-6">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>
+            <span class="text-xs font-semibold text-slate-200">System: Healthy</span>
+          </div>
+          <div class="h-4 w-px bg-slate-700 hidden sm:block"></div>
+          <div class="text-xs text-slate-300 hidden sm:block">
+            Latency: <span id="latency-display" class="text-white font-mono font-bold">0.45s</span>
+          </div>
+          <button 
+            id="reset-btn"
+            class="px-3 py-1 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-600 rounded text-xs font-semibold text-slate-200 transition-colors flex items-center gap-1.5"
+            title="Reset conversation state"
+          >
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Reset
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Columns Content -->
+      <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: Extract Context & Catalog -->
+        <aside class="w-80 border-r border-slate-300 bg-white flex flex-col overflow-hidden shrink-0 hidden md:flex">
+          <!-- Sidebar Tabs -->
+          <div class="flex border-b border-slate-200 bg-slate-50">
+            <button 
+              id="tab-context"
+              class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-2 border-blue-800 text-blue-950 bg-white font-extrabold"
+            >
+              <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+              Live Context
+            </button>
+            <button 
+              id="tab-catalog"
+              class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+            >
+              <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+              SHL Catalog
+            </button>
+          </div>
+
+          <!-- Sidebar Panels Container -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-5">
+            
+            <!-- Live Context Panel -->
+            <div id="panel-context" class="space-y-5">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <h2 class="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                    Extracted Context (Slots)
+                  </h2>
+                  <span class="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse">
+                    Real-Time
+                  </span>
+                </div>
+
+                <div class="space-y-3">
+                  <!-- Role Slot -->
+                  <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 transition-colors hover:bg-slate-100/50">
+                    <div class="flex items-center justify-between">
+                      <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Target Role</p>
+                      <span class="text-[9px] text-slate-500 font-medium">Slot A</span>
+                    </div>
+                    <p id="slot-role" class="text-sm font-semibold mt-1 text-slate-400 italic font-normal">
+                      Waiting for role specification...
+                    </p>
+                  </div>
+
+                  <!-- Seniority Slot -->
+                  <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 transition-colors hover:bg-slate-100/50">
+                    <div class="flex items-center justify-between">
+                      <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Seniority Level</p>
+                      <span class="text-[9px] text-slate-500 font-medium">Slot B</span>
+                    </div>
+                    <p id="slot-seniority" class="text-sm font-semibold mt-1 text-slate-400 italic font-normal">
+                      Detecting candidate level...
+                    </p>
+                  </div>
+
+                  <!-- Skills Slot -->
+                  <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 transition-colors hover:bg-slate-100/50">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Skill Focus</p>
+                      <span class="text-[9px] text-slate-500 font-medium">Slot C</span>
+                    </div>
+                    <div id="slot-skills-container" class="flex flex-wrap gap-1 mt-1">
+                      <p class="text-xs text-slate-400 italic">No skills isolated yet...</p>
+                    </div>
+                  </div>
+
+                  <!-- Intent State Slot -->
+                  <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 transition-colors hover:bg-slate-100/50">
+                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Inferred Dialogue Goal</p>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span id="intent-indicator" class="w-2 h-2 rounded-full bg-blue-400"></span>
+                      <span id="slot-intent" class="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                        CLARIFY
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- FAISS Retrieval Snippets -->
+              <div class="border-t border-slate-200 pt-4">
+                <h2 class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <i data-lucide="database" class="w-3.5 h-3.5 text-slate-400"></i>
+                  Retrieval Ground Truth
+                </h2>
+                <div class="space-y-2">
+                  <div class="p-2.5 text-[11px] text-slate-600 border-l-2 border-[#002B49] bg-slate-50 rounded-r">
+                    <span class="font-bold text-slate-800 block text-[9px] uppercase tracking-wider">Verify G+ general</span>
+                    "Multi-faceted test evaluating logic, numbers, and inductive deduction for general management roles."
+                  </div>
+                  <div class="p-2.5 text-[11px] text-slate-600 border-l-2 border-indigo-600 bg-slate-50 rounded-r">
+                    <span class="font-bold text-slate-800 block text-[9px] uppercase tracking-wider">OPQ32 Occupational style</span>
+                    "Grounded questionnaire probing 32 styles of management, decision logic, and operational performance."
+                  </div>
+                  <div class="p-2.5 text-[11px] text-slate-600 border-l-2 border-emerald-600 bg-slate-50 rounded-r">
+                    <span class="font-bold text-slate-800 block text-[9px] uppercase tracking-wider">Coding tests (Python/JS)</span>
+                    "Professional sandbox-based algorithmic parsing evaluating direct syntax and memory structures."
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SHL Catalog Panel -->
+            <div id="panel-catalog" class="space-y-4 hidden">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input 
+                  id="catalog-search" 
+                  type="text" 
+                  placeholder="Search assessments..." 
+                  class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <p id="catalog-count" class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                Available Products (0)
+              </p>
+              <div id="catalog-list" class="space-y-2.5">
+                <!-- Dynamically loaded catalog items will go here -->
+              </div>
+            </div>
+
+          </div>
+        </aside>
+
+        <!-- Right Section: Chat Interface -->
+        <section class="flex-1 flex flex-col bg-slate-50 relative overflow-hidden">
+          
+          <!-- Interactive Scenarios Bar (Shown on first turn) -->
+          <div id="scenarios-bar" class="p-4 bg-blue-50/50 border-b border-slate-200 shrink-0">
+            <div class="flex items-center gap-2 mb-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>
+              <span class="text-xs font-bold text-blue-900 uppercase tracking-wider">Interactive Scenarios</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                class="scenario-btn text-left p-2.5 bg-white border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-medium text-slate-700 hover:text-blue-950 hover:bg-blue-50/30 transition-all shadow-xs"
+                data-text="I am hiring a Senior Python Developer. We need advanced Python skills but also someone with strong leadership potential."
+              >
+                <div class="font-bold text-blue-900 text-[11px] mb-0.5">Python Developer + Leadership</div>
+                <div class="text-[10px] text-slate-500 line-clamp-1">Screening senior devs for python knowledge and OPQ behavioral leadership traits.</div>
+              </button>
+              <button
+                class="scenario-btn text-left p-2.5 bg-white border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-medium text-slate-700 hover:text-blue-950 hover:bg-blue-50/30 transition-all shadow-xs"
+                data-text="Looking for an assessment for an entry-level Graduate Financial Analyst to test numerical and analytical reasoning."
+              >
+                <div class="font-bold text-blue-900 text-[11px] mb-0.5">Graduate Financial Analyst</div>
+                <div class="text-[10px] text-slate-500 line-clamp-1">Testing entry-level financial accountants for numerical math reasoning.</div>
+              </button>
+              <button
+                class="scenario-btn text-left p-2.5 bg-white border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-medium text-slate-700 hover:text-blue-950 hover:bg-blue-50/30 transition-all shadow-xs"
+                data-text="Can you compare the Verify G+ Ability Test and the OPQ32 Personality Questionnaire for me?"
+              >
+                <div class="font-bold text-blue-900 text-[11px] mb-0.5">Compare Verify G+ vs OPQ32</div>
+                <div class="text-[10px] text-slate-500 line-clamp-1">Asking for explicit comparison between cognitive ability and personality metrics.</div>
+              </button>
+              <button
+                class="scenario-btn text-left p-2.5 bg-white border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-medium text-slate-700 hover:text-blue-950 hover:bg-blue-50/30 transition-all shadow-xs"
+                data-text="I need to screen administrative assistants for high-level Microsoft Excel skills and fluent English communication."
+              >
+                <div class="font-bold text-blue-900 text-[11px] mb-0.5">Excel & English Language</div>
+                <div class="text-[10px] text-slate-500 line-clamp-1">Testing secretaries for SVAR english language and MS Excel essentials.</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Chat Conversation Logs -->
+          <div id="chat-messages" class="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">
+            <!-- Dynamically populated chat bubbles will go here -->
+          </div>
+
+          <!-- Loader element -->
+          <div id="chat-loader" class="hidden px-4 md:px-6 py-4 flex justify-start gap-3 animate-pulse shrink-0 bg-slate-50">
+            <div class="w-9 h-9 rounded-full bg-slate-300 flex items-center justify-center shrink-0">
+              <i data-lucide="cpu" class="w-5 h-5 text-[#002B49] animate-spin"></i>
+            </div>
+            <div class="max-w-[70%] bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-3">
+              <div class="flex space-x-1">
+                <div class="w-2.5 h-2.5 bg-[#002B49] rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                <div class="w-2.5 h-2.5 bg-[#002B49] rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                <div class="w-2.5 h-2.5 bg-[#002B49] rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+              </div>
+              <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Analyzing requirements...</span>
+            </div>
+          </div>
+
+          <!-- Input Controls Form -->
+          <div class="bg-white border-t border-slate-200 p-4 shrink-0 flex flex-col gap-2">
+            <form id="chat-form" class="flex items-center gap-3">
+              <div class="flex-1 bg-slate-100 rounded-lg border border-slate-300 px-4 py-2 flex items-center transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:shadow-xs">
+                <input 
+                  id="chat-input" 
+                  type="text" 
+                  placeholder="Type your refinement or response..." 
+                  class="bg-transparent border-none focus:outline-none w-full text-sm text-slate-800 placeholder:text-slate-400"
+                />
+              </div>
+              <button 
+                id="send-btn"
+                type="submit"
+                class="bg-[#002B49] hover:bg-blue-900 active:bg-blue-950 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+              >
+                <span>Send</span>
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
+            </form>
+
+            <p id="turns-error" class="hidden text-[10px] text-red-600 font-semibold tracking-wider text-center uppercase mt-1">
+              Dialogue turn threshold reached (8 of 8 turns consumed). Let's finalize or click reset above to restart.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <!-- Bottom Status Bar -->
+      <footer class="h-10 bg-white border-t border-slate-200 flex items-center justify-between px-6 shrink-0 text-[10px] font-bold text-slate-400">
+        <div class="flex gap-4">
+          <div class="flex items-center gap-1.5 uppercase">
+            <span id="turn-dot" class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+            <span id="turn-tracker">TURN 0 OF 8 USED</span>
+          </div>
+          <div class="h-3 w-px bg-slate-200"></div>
+          <div class="flex items-center gap-1.5 uppercase">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Grounded Model Sandbox (Python)
+          </div>
+        </div>
+        <div class="italic text-[10px] text-slate-400 font-medium">
+          Database Catalog: shl_catalog.py (Active Grounding)
+        </div>
+      </footer>
+
+    </div>
+
+    <!-- Product Detail Modal Overlay -->
+    <div id="product-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 flex flex-col">
+        <div class="bg-[#002B49] text-white p-5 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="award" class="w-5 h-5 text-blue-400"></i>
+            <div>
+              <h3 id="modal-type" class="text-sm font-bold tracking-tight text-white uppercase">Cognitive Assessment</h3>
+              <h2 id="modal-name" class="text-base font-extrabold text-white leading-tight">Product Name</h2>
+            </div>
+          </div>
+          <button 
+            id="modal-close-btn"
+            class="text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 rounded-lg transition-colors"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-5 space-y-4 overflow-y-auto max-h-[450px]">
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-bold tracking-wider mb-1">Description</p>
+            <p id="modal-desc" class="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+              Description here.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-2">
+              <i data-lucide="clock" class="w-4 h-4 text-blue-700 shrink-0"></i>
+              <div>
+                <p class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Duration</p>
+                <p id="modal-duration" class="text-xs font-bold text-slate-800">20 minutes</p>
+              </div>
+            </div>
+
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-2">
+              <i data-lucide="languages" class="w-4 h-4 text-emerald-700 shrink-0"></i>
+              <div>
+                <p class="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Languages</p>
+                <p id="modal-languages" class="text-xs font-bold text-slate-800 truncate">English</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-bold tracking-wider mb-1.5">Target Seniority Levels</p>
+            <div id="modal-job-levels" class="flex flex-wrap gap-1.5">
+              <!-- Job levels pills -->
+            </div>
+          </div>
+
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-bold tracking-wider mb-1.5">Core Tested Competencies / Skills</p>
+            <div id="modal-skills" class="flex flex-wrap gap-1.5">
+              <!-- Skill pills -->
+            </div>
+          </div>
+
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-bold tracking-wider mb-1.5">Sample Fit Scenarios (Target Roles)</p>
+            <div id="modal-roles" class="flex flex-wrap gap-1.5">
+              <!-- Target roles pills -->
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 px-5 py-4 border-t border-slate-200 flex items-center justify-between">
+          <span id="modal-id" class="text-xs text-slate-500 font-medium italic">SHL Code</span>
+          <div class="flex gap-2">
+            <button 
+              id="modal-cancel"
+              class="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-lg transition-all"
+            >
+              Close
+            </button>
+            <a 
+              id="modal-url"
+              href="#" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="px-4 py-2 text-xs font-bold text-white bg-[#002B49] hover:bg-blue-900 rounded-lg transition-all flex items-center gap-1.5 shadow-xs"
+            >
+              Official Catalog Page
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Client-Side State Controller script -->
+    <script>
+      let messages = [
+        {
+          role: "assistant",
+          content: "Hello! I am your SHL Assessment Consultant. I can help you find and configure the perfect evaluation tests for your candidates. \n\nTo begin, **what job role are you hiring for**, and what **core competencies or skills** do you want to measure?",
+          slots: {
+            skills: [],
+            intent: "CLARIFY"
+          }
+        }
+      ];
+      let catalogProducts = [];
+      let isLoading = false;
+      let latency = "0.45s";
+      let activeTab = "context";
+      let currentSlots = {
+        skills: [],
+        intent: "CLARIFY"
+      };
+
+      // Helper: Format Markdown to styled HTML safely
+      function formatMarkdown(text) {
+        if (!text) return "";
+        let html = text;
+        
+        // Escape standard tags
+        html = html
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        // Format code segments `code`
+        html = html.replace(/`([^`]+)`/g, '<code class="font-mono text-xs bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-indigo-900 font-semibold">$1</code>');
+
+        // Format bold text **text**
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-extrabold text-blue-900 bg-blue-50/70 px-1 rounded">$1</strong>');
+
+        // Split paragraphs by double newline
+        const paragraphs = html.split(/\n\n+/);
+        const formattedParas = paragraphs.map(para => {
+          // Check if bulleted list
+          if (para.trim().startsWith("- ") || para.trim().startsWith("* ")) {
+            const listItems = para.split(/\n[-*]\s+/);
+            // First item might have prefix
+            if (listItems[0].startsWith("- ") || listItems[0].startsWith("* ")) {
+              listItems[0] = listItems[0].replace(/^[-*]\s+/, "");
+            }
+            const listHtml = listItems
+              .filter(item => item.trim())
+              .map(item => `<li class="ml-4 list-disc mb-1">${item}</li>`)
+              .join("");
+            return `<ul class="mb-2.5 last:mb-0">${listHtml}</ul>`;
+          }
+          // Default paragraph
+          return `<p class="mb-2.5 last:mb-0 leading-relaxed">${para.replace(/\n/g, "<br>")}</p>`;
+        });
+
+        return formattedParas.join("");
+      }
+
+      // Initialize UI Element Selectors
+      const chatMessages = document.getElementById("chat-messages");
+      const chatForm = document.getElementById("chat-form");
+      const chatInput = document.getElementById("chat-input");
+      const sendBtn = document.getElementById("send-btn");
+      const latencyDisplay = document.getElementById("latency-display");
+      const resetBtn = document.getElementById("reset-btn");
+      const scenariosBar = document.getElementById("scenarios-bar");
+      const turnsError = document.getElementById("turns-error");
+      const turnTracker = document.getElementById("turn-tracker");
+      const turnDot = document.getElementById("turn-dot");
+      const chatLoader = document.getElementById("chat-loader");
+
+      const tabContext = document.getElementById("tab-context");
+      const tabCatalog = document.getElementById("tab-catalog");
+      const panelContext = document.getElementById("panel-context");
+      const panelCatalog = document.getElementById("panel-catalog");
+      const catalogSearch = document.getElementById("catalog-search");
+      const catalogCount = document.getElementById("catalog-count");
+      const catalogList = document.getElementById("catalog-list");
+
+      // Slot text fields
+      const slotRole = document.getElementById("slot-role");
+      const slotSeniority = document.getElementById("slot-seniority");
+      const slotSkillsContainer = document.getElementById("slot-skills-container");
+      const slotIntent = document.getElementById("slot-intent");
+      const intentIndicator = document.getElementById("intent-indicator");
+
+      // Modal Elements
+      const productModal = document.getElementById("product-modal");
+      const modalType = document.getElementById("modal-type");
+      const modalName = document.getElementById("modal-name");
+      const modalCloseBtn = document.getElementById("modal-close-btn");
+      const modalDesc = document.getElementById("modal-desc");
+      const modalDuration = document.getElementById("modal-duration");
+      const modalLanguages = document.getElementById("modal-languages");
+      const modalJobLevels = document.getElementById("modal-job-levels");
+      const modalSkills = document.getElementById("modal-skills");
+      const modalRoles = document.getElementById("modal-roles");
+      const modalId = document.getElementById("modal-id");
+      const modalCancel = document.getElementById("modal-cancel");
+      const modalUrl = document.getElementById("modal-url");
+
+      // Fetch Catalog list on load
+      async function loadCatalog() {
+        try {
+          const res = await fetch("/api/catalog");
+          if (res.ok) {
+            catalogProducts = await res.json();
+            renderCatalogList();
+          }
+        } catch (e) {
+          console.error("Failed to load catalog", e);
+        }
+      }
+
+      // Helper to find a product by name term in local catalog
+      function findProductByName(name) {
+        if (!name) return null;
+        return catalogProducts.find(p => 
+          p.name.toLowerCase() === name.toLowerCase() || 
+          name.toLowerCase().includes(p.name.toLowerCase()) || 
+          p.name.toLowerCase().includes(name.toLowerCase())
+        );
+      }
+
+      // Render the Sidebar Catalog Explorer
+      function renderCatalogList() {
+        const searchTerm = catalogSearch.value.toLowerCase();
+        const filtered = catalogProducts.filter(p => {
+          return p.name.toLowerCase().includes(searchTerm) ||
+            p.description.toLowerCase().includes(searchTerm) ||
+            p.type.toLowerCase().includes(searchTerm) ||
+            p.skills.some(s => s.toLowerCase().includes(searchTerm));
+        });
+
+        catalogCount.textContent = `Available Products (${filtered.length})`;
+        
+        if (filtered.length === 0) {
+          catalogList.innerHTML = `<p class="text-xs text-slate-400 italic py-4 text-center">No assessments found matching "${searchTerm}"</p>`;
+          return;
+        }
+
+        catalogList.innerHTML = filtered.map(p => {
+          return `
+            <div 
+              class="p-2.5 border border-slate-200 hover:border-blue-400 rounded-lg bg-slate-50 hover:bg-blue-50/20 cursor-pointer transition-all group"
+              onclick="openProductModal('${p.id}')"
+            >
+              <div class="flex justify-between items-start gap-1">
+                <h3 class="text-xs font-bold text-slate-800 group-hover:text-blue-900 transition-colors">
+                  ${p.name}
+                </h3>
+                <span class="text-[9px] bg-slate-200/80 px-1 py-0.2 rounded shrink-0 font-semibold text-slate-600">
+                  ${p.type}
+                </span>
+              </div>
+              <p class="text-[10px] text-slate-500 line-clamp-2 mt-1">
+                ${p.description}
+              </p>
+              <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-100">
+                <span class="text-[9px] text-slate-400 font-medium flex items-center gap-1">
+                  <i class="w-2.5 h-2.5 inline-block text-slate-400" data-lucide="clock"></i> ${p.duration}
+                </span>
+                <span class="text-[9px] text-blue-700 font-bold group-hover:underline flex items-center gap-0.5">
+                  Details <i class="w-2.5 h-2.5 inline-block" data-lucide="chevron-right"></i>
+                </span>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        // Refresh icons within catalog items
+        lucide.createIcons();
+      }
+
+      // Open Modal by Product ID
+      window.openProductModal = function(id) {
+        const p = catalogProducts.find(prod => prod.id === id);
+        if (!p) return;
+
+        modalType.textContent = p.type + " Assessment";
+        modalName.textContent = p.name;
+        modalDesc.textContent = p.description;
+        modalDuration.textContent = p.duration;
+        modalLanguages.textContent = p.languages.join(", ");
+        modalId.textContent = "SHL Code: " + p.id;
+        modalUrl.href = p.url;
+
+        modalJobLevels.innerHTML = p.jobLevels.map(lvl => 
+          `<span class="text-[10px] font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded border border-slate-200">${lvl}</span>`
+        ).join("");
+
+        modalSkills.innerHTML = p.skills.map(skill => 
+          `<span class="text-[10px] font-bold bg-blue-50 text-blue-800 px-2.5 py-0.5 rounded border border-blue-200 uppercase tracking-wide">${skill}</span>`
+        ).join("");
+
+        modalRoles.innerHTML = p.targetRoles.map(role => 
+          `<span class="text-[10px] font-bold bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded border border-emerald-200">${role}</span>`
+        ).join("");
+
+        productModal.classList.remove("hidden");
+        lucide.createIcons();
+      }
+
+      // Close modal
+      function closeModal() {
+        productModal.classList.add("hidden");
+      }
+
+      // Render conversation log and update chat view
+      function renderMessages() {
+        const userTurns = messages.filter(m => m.role === "user").length;
+        const turnsRemaining = Math.max(0, 8 - userTurns);
+
+        // Hide scenarios-bar if conversation has started
+        if (messages.length > 1) {
+          scenariosBar.classList.add("hidden");
+        } else {
+          scenariosBar.classList.remove("hidden");
+        }
+
+        // Update footer statistics
+        turnTracker.textContent = `TURN ${userTurns} OF 8 USED`;
+        if (turnsRemaining <= 2) {
+          turnDot.className = "w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse";
+          if (turnsRemaining === 0) {
+            turnsError.classList.remove("hidden");
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
+          } else {
+            turnsError.classList.add("hidden");
+          }
+        } else {
+          turnDot.className = "w-1.5 h-1.5 rounded-full bg-blue-600";
+          turnsError.classList.add("hidden");
+          chatInput.disabled = false;
+          sendBtn.disabled = false;
+        }
+
+        chatMessages.innerHTML = messages.map((m, idx) => {
+          const isUser = m.role === "user";
+          
+          let bubbleClass = isUser 
+            ? "bg-[#002B49] text-white border-blue-900 rounded-tr-none" 
+            : "bg-white text-slate-800 border-slate-200 rounded-tl-none";
+
+          let justifyClass = isUser ? "justify-end" : "justify-start gap-3";
+          
+          let recommendationsHtml = "";
+          if (m.recommendations && m.recommendations.length > 0) {
+            recommendationsHtml = `
+              <div class="mt-4 pt-3 border-t border-slate-100 space-y-3">
+                <p class="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <i class="w-3.5 h-3.5 inline-block text-green-500" data-lucide="check-circle"></i>
+                  Grounded Assessment Recommendations
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  ${m.recommendations.map(rec => {
+                    const match = findProductByName(rec.name);
+                    return `
+                      <div class="p-3 border border-slate-200 hover:border-blue-400 rounded-lg bg-slate-50 hover:bg-white transition-all shadow-xs flex flex-col justify-between">
+                        <div>
+                          <div class="flex justify-between items-start gap-1">
+                            <h4 class="text-xs font-bold text-blue-950 line-clamp-1">${rec.name}</h4>
+                            ${match ? `<span class="text-[8px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-semibold uppercase tracking-wide shrink-0">${match.type}</span>` : ""}
+                          </div>
+                          <p class="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                            ${match ? match.description : "Verifiable SHL standard assessment module."}
+                          </p>
+                        </div>
+                        <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                          ${match ? `
+                            <button 
+                              class="text-[10px] text-blue-800 font-bold hover:underline flex items-center gap-0.5"
+                              onclick="openProductModal('${match.id}')"
+                            >
+                              Inspect Details <i class="w-3 h-3 inline-block" data-lucide="chevron-right"></i>
+                            </button>
+                          ` : `<span></span>`}
+                          <a 
+                            href="${rec.url}" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            class="text-[10px] text-slate-500 hover:text-blue-900 font-semibold flex items-center gap-1 hover:underline"
+                          >
+                            SHL Page <i class="w-2.5 h-2.5 inline-block" data-lucide="external-link"></i>
+                          </a>
+                        </div>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="flex ${justifyClass} animate-fade-in">
+              ${!isUser ? `
+                <div class="w-9 h-9 rounded-full bg-slate-300 flex items-center justify-center shrink-0 border border-slate-400/50 text-[#002B49] font-bold shadow-sm">
+                  <i class="w-5 h-5 text-[#002B49]" data-lucide="cpu"></i>
+                </div>
+              ` : ""}
+              <div class="max-w-[85%] md:max-w-[75%] p-4 rounded-2xl shadow-sm border ${bubbleClass}">
+                <div class="text-sm leading-relaxed whitespace-pre-wrap">
+                  ${formatMarkdown(m.content)}
+                </div>
+                ${recommendationsHtml}
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        // Refresh icons inside message bubbles
+        lucide.createIcons();
+
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      // Render Context panel slots from currentSlots
+      function renderContextSlots() {
+        slotRole.className = currentSlots.role ? "text-sm font-semibold mt-1 text-slate-900" : "text-sm font-semibold mt-1 text-slate-400 italic font-normal";
+        slotRole.textContent = currentSlots.role || "Waiting for role specification...";
+
+        slotSeniority.className = currentSlots.seniority ? "text-sm font-semibold mt-1 text-slate-900" : "text-sm font-semibold mt-1 text-slate-400 italic font-normal";
+        slotSeniority.textContent = currentSlots.seniority || "Detecting candidate level...";
+
+        if (currentSlots.skills && currentSlots.skills.length > 0) {
+          slotSkillsContainer.innerHTML = currentSlots.skills.map(skill => 
+            `<span class="px-2 py-0.5 bg-blue-50 text-blue-800 text-[10px] font-bold rounded border border-blue-200 uppercase tracking-wide">${skill}</span>`
+          ).join("");
+        } else {
+          slotSkillsContainer.innerHTML = `<p class="text-xs text-slate-400 italic">No skills isolated yet...</p>`;
+        }
+
+        const intent = currentSlots.intent || "CLARIFY";
+        slotIntent.textContent = intent;
+        
+        if (intent === "RECOMMEND") {
+          intentIndicator.className = "w-2 h-2 rounded-full bg-indigo-600";
+        } else if (intent === "COMPARE") {
+          intentIndicator.className = "w-2 h-2 rounded-full bg-amber-500";
+        } else if (intent === "CLARIFY") {
+          intentIndicator.className = "w-2 h-2 rounded-full bg-blue-400";
+        } else {
+          intentIndicator.className = "w-2 h-2 rounded-full bg-slate-400";
+        }
+      }
+
+      // Send chat message action
+      async function handleSendMessage(text) {
+        if (!text || !text.trim() || isLoading) return;
+
+        messages.push({ role: "user", content: text });
+        chatInput.value = "";
+        isLoading = true;
+        chatLoader.classList.remove("hidden");
+        sendBtn.disabled = true;
+        
+        renderMessages();
+
+        const startTime = Date.now();
+
+        try {
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: messages.map(m => ({ role: m.role, content: m.content }))
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+
+          const data = await response.json();
+          const endTime = Date.now();
+          latency = ((endTime - startTime) / 1000).toFixed(2) + "s";
+          latencyDisplay.textContent = latency;
+
+          messages.push({
+            role: "assistant",
+            content: data.reply,
+            recommendations: data.recommendations,
+            slots: data.slots
+          });
+
+          if (data.slots) {
+            currentSlots = data.slots;
+          }
+
+        } catch (e) {
+          console.error("Chat API error:", e);
+          messages.push({
+            role: "assistant",
+            content: "I apologize, but I had trouble processing that request. Please make sure your GEMINI_API_KEY is configured in the Secrets menu and try again."
+          });
+        } finally {
+          isLoading = false;
+          chatLoader.classList.add("hidden");
+          sendBtn.disabled = false;
+          renderMessages();
+          renderContextSlots();
+        }
+      }
+
+      // Reset conversation trigger
+      function resetConversation() {
+        messages = [
+          {
+            role: "assistant",
+            content: "Hello! I am your SHL Assessment Consultant. I can help you find and configure the perfect evaluation tests for your candidates. \n\nTo begin, **what job role are you hiring for**, and what **core competencies or skills** do you want to measure?",
+            slots: {
+              skills: [],
+              intent: "CLARIFY"
+            }
+          }
+        ];
+        currentSlots = {
+          skills: [],
+          intent: "CLARIFY"
+        };
+        latency = "0.45s";
+        latencyDisplay.textContent = latency;
+        renderMessages();
+        renderContextSlots();
+      }
+
+      // Event Listeners initialization on load
+      window.addEventListener("DOMContentLoaded", () => {
+        // Init Lucide
+        lucide.createIcons();
+
+        // Load Catalog
+        loadCatalog();
+
+        // Render initial UI
+        renderMessages();
+        renderContextSlots();
+
+        // Form Submit
+        chatForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          handleSendMessage(chatInput.value);
+        });
+
+        // Scenario button clicks
+        document.querySelectorAll(".scenario-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const promptText = btn.getAttribute("data-text");
+            handleSendMessage(promptText);
+          });
+        });
+
+        // Reset click
+        resetBtn.addEventListener("click", resetConversation);
+
+        // Sidebar Tabs toggles
+        tabContext.addEventListener("click", () => {
+          activeTab = "context";
+          tabContext.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-2 border-blue-800 text-blue-950 bg-white font-extrabold";
+          tabCatalog.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100";
+          panelContext.classList.remove("hidden");
+          panelCatalog.classList.add("hidden");
+        });
+
+        tabCatalog.addEventListener("click", () => {
+          activeTab = "catalog";
+          tabCatalog.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-2 border-blue-800 text-blue-950 bg-white font-extrabold";
+          tabContext.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100";
+          panelCatalog.classList.remove("hidden");
+          panelContext.classList.add("hidden");
+          renderCatalogList();
+        });
+
+        // Catalog live search
+        catalogSearch.addEventListener("input", renderCatalogList);
+
+        // Modal triggers
+        modalCloseBtn.addEventListener("click", closeModal);
+        modalCancel.addEventListener("click", closeModal);
+        productModal.addEventListener("click", (e) => {
+          if (e.target === productModal) closeModal();
+        });
+      });
+    </script>
+  </body>
+</html>
