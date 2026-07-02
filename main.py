@@ -7,8 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+from openai import OpenAI
 
 from shl_catalog import shl_products, SHLProduct
 
@@ -35,21 +34,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Gemini Client
-api_key = os.getenv("GEMINI_API_KEY")
+# Initialize Groq Client (OpenAI-compatible API, generous free tier)
+api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
-    logger.warning("GEMINI_API_KEY environment variable not set. Please set it before sending chat queries.")
+    logger.warning("GROQ_API_KEY environment variable not set. Please set it before sending chat queries.")
 
-# We use the official modern genai Client
-# We set user-agent to 'aistudio-build' for telemetry
 try:
-    ai_client = genai.Client(
+    ai_client = OpenAI(
         api_key=api_key,
-        http_options={"headers": {"User-Agent": "aistudio-build"}}
+        base_url="https://api.groq.com/openai/v1"
     )
 except Exception as e:
-    logger.error(f"Failed to initialize Gemini Client: {e}")
+    logger.error(f"Failed to initialize Groq Client: {e}")
     ai_client = None
+
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # Request and Response schemas
 class Message(BaseModel):
@@ -125,22 +124,29 @@ PRODUCT_TEST_TYPE_MAPPING = {
 }
 
 def get_test_type_code(type_str: str) -> str:
-    """Helper to convert human test types into short codes like K, P, A, S, B, C, D."""
+    """Maps a catalog product's `type` field to its short SHL test-type code
+    (K=Knowledge&Skills, P=Personality, A=Ability&Aptitude, S=Simulations,
+    B=Biodata&SituationalJudgment, C=Competencies, D=Development&360, E=AssessmentExercises).
+    Falls back to 'K' only if the type is genuinely unrecognized."""
     mapping = {
-        "technical": "K",
-        "skills": "S",
-        "personality": "P",
-        "cognitive": "A",
-        "behavioral": "B",
-        "language": "K"
+        "ability & aptitude": "A",
+        "knowledge & skills": "K",
+        "personality & behavior": "P",
+        "simulations": "S",
+        "biodata & situational judgment": "B",
+        "competencies": "C",
+        "development & 360": "D",
+        "assessment exercises": "E",
     }
-    return mapping.get(type_str.lower(), "K")
+    if not type_str:
+        return "K"
+    return mapping.get(type_str.strip().lower(), "K")
 
 def run_advisor(conversation_text: str) -> Dict[str, Any]:
-    """Uses a single unified Gemini call to determine intent, slots, text reply, and recommendations."""
+    """Uses a single unified Groq (Llama 3.3 70B) call to determine intent, slots, text reply, and recommendations."""
     if not ai_client:
         return {
-            "reply": "I am unable to connect to the Gemini service. Please check your configuration.",
+            "reply": "I am unable to connect to the assessment advisor service. Please check your configuration.",
             "recommended_product_ids": [],
             "end_of_conversation": False,
             "slots": {
@@ -209,48 +215,19 @@ You MUST respond with a valid JSON object matching this schema. Make sure to pop
 """
 
     try:
-        response = ai_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=types.Schema(
-                    type=types.Type.OBJECT,
-                    properties={
-                        "reply": types.Schema(
-                            type=types.Type.STRING,
-                            description="Conversational consultant response. Keep it friendly, clear, and professional."
-                        ),
-                        "recommended_product_ids": types.Schema(
-                            type=types.Type.ARRAY,
-                            items=types.Schema(type=types.Type.STRING),
-                            description="Active recommended product IDs from the catalog. MUST be empty if gathering context, deflecting, or comparing without confirmed selection."
-                        ),
-                        "end_of_conversation": types.Schema(
-                            type=types.Type.BOOLEAN,
-                            description="Set to true ONLY if the user is fully satisfied or explicitly confirms/locks in the selection."
-                        ),
-                        "slots": types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "role": types.Schema(type=types.Type.STRING),
-                                "seniority": types.Schema(type=types.Type.STRING),
-                                "skills": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING)),
-                                "testType": types.Schema(type=types.Type.STRING),
-                                "intent": types.Schema(type=types.Type.STRING),
-                                "selectedProductsForComparison": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING)),
-                                "isConfirmed": types.Schema(type=types.Type.BOOLEAN)
-                            },
-                            required=["role", "seniority", "skills", "testType", "intent", "selectedProductsForComparison", "isConfirmed"]
-                        )
-                    },
-                    required=["reply", "recommended_product_ids", "end_of_conversation", "slots"]
-                )
-            )
+        response = ai_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a strict JSON API. Always respond with ONLY a single valid JSON object matching the schema given in the user prompt. No markdown, no code fences, no explanation text outside the JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
         )
-        
+
         # Parse result safely
-        parsed = json.loads(response.text.strip())
+        raw_text = response.choices[0].message.content.strip()
+        parsed = json.loads(raw_text)
         logger.info(f"Advisor generated output: {parsed}")
         return parsed
     except Exception as e:
@@ -284,7 +261,7 @@ async def chat_endpoint(request: ChatRequest):
     if not ai_client:
         raise HTTPException(
             status_code=500,
-            detail="Gemini API Client is not configured. Please set the GEMINI_API_KEY environment variable."
+            detail="Groq API Client is not configured. Please set the GROQ_API_KEY environment variable."
         )
 
     try:
